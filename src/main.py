@@ -75,10 +75,11 @@ def main():
                 # get intermediate layer outputs
                 for k, v in zip(train_outputs.keys(), outputs):
                     train_outputs[k].append(v)
-                # initialize hook outputs
+                # initialize hook outputs，下一类,训练测试要用,转移到train_outputs
+                # 这一类全部完成
                 outputs = []
             for k, v in train_outputs.items():
-                train_outputs[k] = torch.cat(v, 0)
+                train_outputs[k] = torch.cat(v, 0)  # (N,C,H,W)  N就是一类训练集图片数
             # save extracted feature
             with open(train_feature_filepath, 'wb') as f:
                 pickle.dump(train_outputs, f)
