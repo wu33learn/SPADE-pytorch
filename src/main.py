@@ -38,6 +38,7 @@ def main():
     model.eval()
 
     # set model's intermediate outputs
+    # 注册钩子
     outputs = []
     def hook(module, input, output):
         outputs.append(output)
