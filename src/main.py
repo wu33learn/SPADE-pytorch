@@ -70,9 +70,10 @@ def main():
         train_feature_filepath = os.path.join(args.save_path, 'temp', 'train_%s.pkl' % class_name)
         if not os.path.exists(train_feature_filepath):
             for (x, y, mask) in tqdm(train_dataloader, '| feature extraction | train | %s |' % class_name):
+                # x是图片，y是image-level的ytrue，mask是pixel-level的ytrue
                 # model prediction
                 with torch.no_grad():
-                    pred = model(x.to(device))
+                    pred = model(x.to(device))  # 数据传到GPU
                 # get intermediate layer outputs
                 for k, v in zip(train_outputs.keys(), outputs):
                     train_outputs[k].append(v)
@@ -103,13 +104,13 @@ def main():
                 pred = model(x.to(device))
             # get intermediate layer outputs
             for k, v in zip(test_outputs.keys(), outputs):
-                test_outputs[k].append(v)
+                test_outputs[k].append(v) 
             # initialize hook outputs
             outputs = []
         for k, v in test_outputs.items():
             test_outputs[k] = torch.cat(v, 0)
 
-        # calculate distance matrix
+        # calculate distance matrix  就是（N,c*H*W）
         dist_matrix = calc_dist_matrix(torch.flatten(test_outputs['avgpool'], 1),
                                        torch.flatten(train_outputs['avgpool'], 1))
 
