@@ -110,7 +110,7 @@ def main():
         for k, v in test_outputs.items():
             test_outputs[k] = torch.cat(v, 0)
 
-        # calculate distance matrix  就是（N,c*H*W）
+        # calculate distance matrix  计算异常得分image-level （N,c*H*W）
         dist_matrix = calc_dist_matrix(torch.flatten(test_outputs['avgpool'], 1),
                                        torch.flatten(train_outputs['avgpool'], 1))
 
