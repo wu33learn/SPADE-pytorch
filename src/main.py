@@ -110,15 +110,15 @@ def main():
         for k, v in test_outputs.items():
             test_outputs[k] = torch.cat(v, 0)
 
-        # calculate distance matrix  计算异常得分image-level （N,c*H*W）
+        # calculate distance matrix  计算距离矩阵 （Ntest,Ntrain）
         dist_matrix = calc_dist_matrix(torch.flatten(test_outputs['avgpool'], 1),
                                        torch.flatten(train_outputs['avgpool'], 1))
 
-        # select K nearest neighbor and take average
+        # select K nearest neighbor and take average  KNN求异常得分
         topk_values, topk_indexes = torch.topk(dist_matrix, k=args.top_k, dim=1, largest=False)
         scores = torch.mean(topk_values, 1).cpu().detach().numpy()
 
-        # calculate image-level ROC AUC score
+        # calculate image-level ROC AUC score  取阈值，画roc，算auc
         fpr, tpr, _ = roc_curve(gt_list, scores)
         roc_auc = roc_auc_score(gt_list, scores)
         total_roc_auc.append(roc_auc)
@@ -131,21 +131,28 @@ def main():
             for layer_name in ['layer1', 'layer2', 'layer3']:  # for each layer
 
                 # construct a gallery of features at all pixel locations of the K nearest neighbors
-                topk_feat_map = train_outputs[layer_name][topk_indexes[t_idx]]
-                test_feat_map = test_outputs[layer_name][t_idx:t_idx + 1]
-                feat_gallery = topk_feat_map.transpose(3, 1).flatten(0, 2).unsqueeze(-1).unsqueeze(-1)
+                topk_feat_map = train_outputs[layer_name][topk_indexes[t_idx]]  # 多个索引 最近五个图片的特征图 ()  这就是为什么test  train而不是train test 方便通过返回的train索引找对应的train图
+                #test_feat_map = test_outputs[layer_name][t_idx:t_idx + 1]  # 切片有第一维度 (1,c,h,w)
+                test_feat_map = test_outputs[layer_name][t_idx:t_idx + 1].permute(0,2,3,1)
+                feat_gallery = topk_feat_map.transpose(3, 1).flatten(0, 2).unsqueeze(-2).unsqueeze(-2)  # transpose(3,1)可能比(2,3,1)快
+                # feat_gallery = topk_feat_map.transpose(3, 1).flatten(0, 2).unsqueeze(-1).unsqueeze(-1)  # (5,c,h,w)  (5,w,h,c)  (5*w*h,c)  (5*w*h,c,1,1)  这个完全没关系  不会用到索引
+                
+
+                # h,w,c
+                
 
                 # calculate distance matrix
                 dist_matrix_list = []
                 for d_idx in range(feat_gallery.shape[0] // 100):
-                    dist_matrix = torch.pairwise_distance(feat_gallery[d_idx * 100:d_idx * 100 + 100], test_feat_map)
+                    dist_matrix = torch.pairwise_distance(feat_gallery[d_idx * 100:d_idx * 100 + 100], test_feat_map)  # (100,1,1,c)  (1,h,w,c)
                     dist_matrix_list.append(dist_matrix)
-                dist_matrix = torch.cat(dist_matrix_list, 0)
+                dist_matrix = torch.cat(dist_matrix_list, 0)  # (N,h,w)
 
                 # k nearest features from the gallery (k=1)
-                score_map = torch.min(dist_matrix, dim=0)[0]
+                score_map = torch.min(dist_matrix, dim=0)[0]  # torch.min返回values，index
+                #score_map = torch.min(dist_matrix, dim=0) # (h,w)
                 score_map = F.interpolate(score_map.unsqueeze(0).unsqueeze(0), size=224,
-                                          mode='bilinear', align_corners=False)
+                                          mode='bilinear', align_corners=False) # (1,1,224,224)
                 score_maps.append(score_map)
 
             # average distance between the features
